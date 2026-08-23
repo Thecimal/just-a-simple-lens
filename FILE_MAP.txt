@@ -1,0 +1,270 @@
+================================================================================
+  LENS — SEO & GEO ANALYZER — Complete File Structure
+================================================================================
+
+geo-seo-analyzer/
+│
+├── README.md                                [START HERE - Full setup guide]
+├── PROJECT_STRUCTURE.md                     [Detailed architecture & data flow]
+├── FILE_MAP.txt                             [This file - visual directory map]
+├── .gitignore                               [Git ignore rules]
+├── package.json                             [Root workspace config (npm workspaces)]
+│
+│
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                           BACKEND — apps/api/                             ║
+║                   Node.js + Playwright + Express + LLM                    ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+│
+├── apps/api/
+│   │
+│   ├── package.json                         [Dependencies: playwright, express, @anthropic-ai/sdk, etc.]
+│   ├── .env.example                         [Template → copy to .env, add ANTHROPIC_API_KEY]
+│   │
+│   └── src/
+│       │
+│       ├── server.js                        [Express entrypoint (port 8787)]
+│       │                                    • CORS, rate limiting, logging
+│       │                                    • /health check
+│       │                                    • Routes: /api/analyze, /api/analyze/stream
+│       │
+│       │
+│       ├── crawler/                         [═══ THE CRAWLER ENGINE ═══]
+│       │   │
+│       │   └── scraper.js                   [Dual-crawl strategy]
+│       │                                    • crawlRendered() → full JS, rendered DOM
+│       │                                    • crawlRawForAI() → no-JS, GPTBot UA
+│       │                                    • Extracts: meta, headings, links, images,
+│       │                                                 schema, performance metrics
+│       │                                    • Returns: { rendered, rawCrawl, diff, ... }
+│       │
+│       │
+│       ├── analyzers/                       [═══ ANALYSIS PIPELINES ═══]
+│       │   │
+│       │   ├── seoAnalyzer.js              [Traditional SEO Pipeline]
+│       │   │                                • Scores: title, meta desc, canonical,
+│       │   │                                          headings, keyword density,
+│       │   │                                          schema, links, images, robots
+│       │   │                                • Returns: { score: 0-100,
+│       │   │                                           subscores: {...},
+│       │   │                                           findings: [...] }
+│       │   │
+│       │   ├── geoAnalyzer.js              [GEO (Generative Engine) Pipeline]
+│       │   │                                • Scores: chunkability (RAG-friendliness),
+│       │   │                                          semantic HTML ratio,
+│       │   │                                          citation density (stats/quotes/entities),
+│       │   │                                          direct-answer block,
+│       │   │                                          JS-dependency penalty
+│       │   │                                • Returns: { score: 0-100,
+│       │   │                                           subscores: {...},
+│       │   │                                           extractedSignals: {...},
+│       │   │                                           findings: [...] }
+│       │   │
+│       │   ├── llmCitationSimulator.js      [LLM Simulation (Claude)]
+│       │   │                                • Sends raw content to Claude API
+│       │   │                                • Asks: "Would you cite this as a primary source?"
+│       │   │                                • Enforces strict JSON schema
+│       │   │                                • Graceful fallback if API fails
+│       │   │                                • Returns: { wouldCite, citationConfidence,
+│       │   │                                           primaryTopic, coreEntities,
+│       │   │                                           extractableClaims,
+│       │   │                                           likelyQueryMatch, citationRisks,
+│       │   │                                           reasoning }
+│       │   │
+│       │   └── suggestionsEngine.js         [Findings Merger & Prioritizer]
+│       │                                    • Combines SEO + GEO findings
+│       │                                    • Merges LLM citation_risks
+│       │                                    • Ranks by severity (critical > warning > minor)
+│       │                                    • Returns: { summary, seoFixes, geoFixes, quickWins }
+│       │
+│       │
+│       ├── routes/                          [═══ EXPRESS ROUTES ═══]
+│       │   │
+│       │   └── analyze.js                   [POST /api/analyze (blocking)]
+│       │                                    [GET /api/analyze/stream?url=... (SSE)]
+│       │                                    • Orchestrates: crawl → SEO → GEO → LLM → suggestions
+│       │                                    • Streams progress via SSE
+│       │                                    • Returns full report JSON
+│       │
+│       │
+│       └── utils/                           [═══ UTILITY FUNCTIONS ═══]
+│           │
+│           ├── htmlCleaner.js               [HTML Processing]
+│           │                                • cleanHtml() → strips scripts, ads, boilerplate
+│           │                                • htmlToReadableText() → plain text with para breaks
+│           │                                • extractStructuralOutline() → DOM tag hierarchy
+│           │
+│           └── validateUrl.js               [URL Validation]
+│                                            • isValidHttpUrl() → checks http(s) scheme
+
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                           FRONTEND — apps/web/                            ║
+║                      Astro + React + Tailwind CSS                         ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+│
+├── apps/web/
+│   │
+│   ├── package.json                         [Dependencies: astro, react, @astrojs/react,
+│   │                                         @astrojs/tailwind, tailwindcss]
+│   │
+│   ├── astro.config.mjs                     [Astro configuration]
+│   │                                        • React integration
+│   │                                        • Tailwind integration
+│   │                                        • Output: static (Cloudflare Pages)
+│   │                                        • PUBLIC_API_BASE_URL env var
+│   │
+│   ├── tailwind.config.js                   [Design System]
+│   │                                        Colors:
+│   │                                        • ink (bg), surface, raised, hairline
+│   │                                        • ash (text), dim
+│   │                                        • seo (blue), geo (amber)
+│   │                                        • critical (red), warn, minor
+│   │                                        Fonts:
+│   │                                        • IBM Plex Mono (code/data)
+│   │                                        • IBM Plex Sans (body)
+│   │
+│   │
+│   └── src/
+│       │
+│       ├── pages/                           [═══ ASTRO PAGES ═══]
+│       │   │
+│       │   └── index.astro                  [/ Route — Main page]
+│       │                                    • Mounts Dashboard as React island
+│       │                                    • Uses Layout wrapper
+│       │
+│       │
+│       ├── layouts/                         [═══ ASTRO LAYOUTS ═══]
+│       │   │
+│       │   └── Layout.astro                 [Base HTML wrapper]
+│       │                                    • DOCTYPE, head, meta tags
+│       │                                    • Global CSS import
+│       │                                    • <slot> for page content
+│       │
+│       │
+│       ├── components/                      [═══ REACT COMPONENTS ═══]
+│       │   │
+│       │   ├── Dashboard.jsx                [STATE MANAGER]
+│       │   │                                • Scan lifecycle: idle → loading → done/error
+│       │   │                                • SSE listener: stages & final report
+│       │   │                                • Composes all child components
+│       │   │                                • Renders: header, form, gauge, signals, suggestions
+│       │   │
+│       │   ├── ScoreGauge.jsx               [SIGNATURE VISUAL]
+│       │   │                                • Dual split-gauge (one circle, two halves)
+│       │   │                                • Left half: SEO (blue), fills outward
+│       │   │                                • Right half: GEO (amber), fills outward
+│       │   │                                • Center: Overall score
+│       │   │                                • Animated stroke-dasharray for progress
+│       │   │                                • Radial ticks every 25%
+│       │   │
+│       │   ├── SuggestionsPanel.jsx         [TWO-COLUMN FIXES]
+│       │   │                                • Left column: SEO fixes (traditional)
+│       │   │                                • Right column: GEO fixes (AI-specific)
+│       │   │                                • Each fix: severity tag, title, action copy
+│       │   │                                • Sorted by severity (critical → warning → minor)
+│       │   │
+│       │   ├── EntityCitationPanel.jsx      [SIGNALS & VERDICT]
+│       │   │                                • Signal cards: stat count, quote count,
+│       │   │                                             entity count, JS% 
+│       │   │                                • Entity chips: extracted entities
+│       │   │                                • Code block: Claude's JSON verdict
+│       │   │                                  - wouldCite (true/false)
+│       │   │                                  - citationConfidence (0-100)
+│       │   │                                  - reasoning
+│       │   │                                  - likelyQueryMatch
+│       │   │                                  - citationRisks
+│       │   │
+│       │   └── UrlInputForm.jsx             [INPUT BAR]
+│       │                                    • Terminal-style command prompt
+│       │                                    • "analyze > [URL input] [Run scan]"
+│       │                                    • URL validation on submit
+│       │
+│       │
+│       ├── lib/                             [═══ UTILITY FUNCTIONS ═══]
+│       │   │
+│       │   └── api.js                       [SSE CLIENT]
+│       │                                    • analyzeStream(url, onStage callback)
+│       │                                    • Opens EventSource to /api/analyze/stream?url=...
+│       │                                    • Listens for: stage, done, error events
+│       │                                    • Returns Promise<report>
+│       │
+│       │
+│       ├── styles/                          [═══ STYLESHEETS ═══]
+│       │   │
+│       │   └── global.css                   [GLOBAL STYLES]
+│       │                                    • Google Fonts import (IBM Plex)
+│       │                                    • @tailwind directives (base, components, utilities)
+│       │                                    • Base layer: html, body, focus-visible
+│       │                                    • Reduced-motion: @media prefers-reduced-motion
+│       │
+│       │
+│       └── public/                          [═══ STATIC ASSETS ═══]
+│           └── (empty; add favicon, logos, etc. here)
+
+
+================================================================================
+                            DEPLOYMENT TARGETS
+================================================================================
+
+Frontend (apps/web)
+├─ Build: npm run build:web → apps/web/dist/
+└─ Deploy: Cloudflare Pages (free tier, high availability, CDN)
+
+Backend (apps/api)
+├─ Runtime: Node.js 20+
+├─ Process: pm2 or systemd
+├─ Reverse proxy: Nginx/Caddy (TLS termination)
+└─ Host: Ubuntu VPS (AWS, Linode, DigitalOcean, etc.)
+
+
+================================================================================
+                           QUICK FILE REFERENCE
+================================================================================
+
+Modify design?               → tailwind.config.js + components/*.jsx
+Add SEO check?               → seoAnalyzer.js (add scoring function)
+Add GEO check?               → geoAnalyzer.js (add scoring function)
+Swap LLM (Claude → Gemini)?  → llmCitationSimulator.js (modify fetch call)
+Remove LLM entirely?         → llmCitationSimulator.js (heuristic fallback) + routes/analyze.js
+Change API host?             → PUBLIC_API_BASE_URL env var (frontend build)
+Customize rate limiting?     → server.js (express-rate-limit config)
+Add new metric to gauge?     → ScoreGauge.jsx (SVG paths, ticks, labels)
+Change component styles?     → component.jsx (Tailwind classes) + tailwind.config.js (tokens)
+
+
+================================================================================
+                              INSTALL & RUN
+================================================================================
+
+# Install dependencies (both apps)
+npm install
+
+# Backend only (port 8787)
+npm run dev:api
+
+# Frontend only (port 4321)
+npm run dev:web
+
+# Build frontend for production
+npm run build:web
+
+# Check that everything is packaged
+unzip -l geo-seo-analyzer-complete.zip
+
+
+================================================================================
+                             FILE STATISTICS
+================================================================================
+
+Total files: 43
+Total size (uncompressed): ~84 KB
+Compressed (zip): ~40 KB
+
+Backend code: ~9 files, ~45 KB
+Frontend code: ~10 files, ~25 KB
+Config/docs: ~23 files, ~15 KB (includes node_modules templates, public folders)
+
+
+================================================================================
+EOF
