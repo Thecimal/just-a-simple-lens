@@ -17,6 +17,7 @@
 
 import { chromium } from 'playwright';
 import { cleanHtml, htmlToReadableText } from '../utils/htmlCleaner.js';
+import { isSafeAnalyzeUrl } from '../utils/validateUrl.js';
 
 const AI_CRAWLER_UA =
   'Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)';
@@ -42,6 +43,16 @@ const NAV_TIMEOUT_MS = 20_000;
  * }>}
  */
 export async function crawlPage(url) {
+  // Re-validate here, not just at the route layer: this is the function
+  // that actually hands the URL to a real browser, so it's the last line
+  // of defense against SSRF (private IPs, cloud metadata endpoint, etc.)
+  // and it protects any other caller of crawlPage() that might bypass the
+  // HTTP routes entirely (scripts, tests, future callers).
+  const check = await isSafeAnalyzeUrl(url);
+  if (!check.ok) {
+    throw new Error(`Refusing to crawl: ${check.reason}`);
+  }
+
   const browser = await chromium.launch({ headless: true });
 
   try {

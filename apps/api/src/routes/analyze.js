@@ -13,14 +13,15 @@ import { analyzeSeo } from '../analyzers/seoAnalyzer.js';
 import { analyzeGeo } from '../analyzers/geoAnalyzer.js';
 import { simulateLlmCitation } from '../analyzers/llmCitationSimulator.js';
 import { buildSuggestions } from '../analyzers/suggestionsEngine.js';
-import { isValidHttpUrl } from '../utils/validateUrl.js';
+import { isSafeAnalyzeUrl } from '../utils/validateUrl.js';
 
 export const analyzeRouter = Router();
 
 analyzeRouter.post('/analyze', async (req, res) => {
   const { url } = req.body || {};
-  if (!isValidHttpUrl(url)) {
-    return res.status(400).json({ error: 'Provide a valid http(s) URL.' });
+  const check = await isSafeAnalyzeUrl(url);
+  if (!check.ok) {
+    return res.status(400).json({ error: check.reason });
   }
 
   try {
@@ -34,8 +35,9 @@ analyzeRouter.post('/analyze', async (req, res) => {
 
 analyzeRouter.get('/analyze/stream', async (req, res) => {
   const url = req.query.url;
-  if (!isValidHttpUrl(url)) {
-    return res.status(400).json({ error: 'Provide a valid http(s) URL.' });
+  const check = await isSafeAnalyzeUrl(url);
+  if (!check.ok) {
+    return res.status(400).json({ error: check.reason });
   }
 
   res.writeHead(200, {

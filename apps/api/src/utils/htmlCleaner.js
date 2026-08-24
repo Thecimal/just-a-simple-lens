@@ -84,6 +84,25 @@ export function htmlToReadableText(cleanedHtml) {
 }
 
 /**
+ * Extracts heading structure straight from static HTML via cheerio (no
+ * browser needed). Used by the GEO pipeline so heading-dependent checks
+ * (direct-answer H1, heading-to-content ratio) run against the *raw*
+ * no-JS payload — the same thing scraper.js's rawCrawl pass fetches —
+ * rather than the JS-rendered DOM, which most AI crawlers never see.
+ * @param {string} cleanedHtml
+ * @returns {Array<{level: number, text: string}>}
+ */
+export function extractHeadingsFromHtml(cleanedHtml) {
+  const $ = cheerio.load(cleanedHtml);
+  return $('h1,h2,h3,h4,h5,h6')
+    .map((_, el) => ({
+      level: Number(el.tagName.substring(1)),
+      text: $(el).text().trim().replace(/\s+/g, ' '),
+    }))
+    .get();
+}
+
+/**
  * Returns the DOM as a lightweight structural outline (tag + depth),
  * used by the GEO analyzer to score semantic HTML usage.
  * @param {string} cleanedHtml

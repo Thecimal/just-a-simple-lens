@@ -14,7 +14,7 @@
 //   3. citationDensity   – stats, quotes, named entities per 100 words
 //   4. directAnswerBlock – is there a front-loaded, extractable summary?
 
-import { extractStructuralOutline } from '../utils/htmlCleaner.js';
+import { extractStructuralOutline, extractHeadingsFromHtml } from '../utils/htmlCleaner.js';
 
 const SEMANTIC_TAGS = new Set([
   'article', 'section', 'header', 'footer', 'nav', 'aside', 'main',
@@ -31,12 +31,20 @@ const QUOTE_PATTERN = /["“][^"”]{15,300}["”]/g;
 const ENTITY_PATTERN = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\b/g;
 
 export function analyzeGeo(crawlResult) {
-  const { rendered, rawCrawl, diff, headings } = crawlResult;
+  const { rawCrawl, diff } = crawlResult;
 
-  const chunkResult = scoreChunkability(rendered.text, headings);
-  const semanticResult = scoreSemanticHtml(rendered.html);
-  const citationResult = scoreCitationDensity(rendered.text);
-  const directAnswerResult = scoreDirectAnswer(rendered.text, headings);
+  // IMPORTANT: every GEO subscore below must run against `rawCrawl`, not
+  // `rendered`. The entire premise of the dual-crawl architecture (see
+  // scraper.js) is that GEO measures what an AI crawler — which mostly
+  // doesn't execute JS — actually receives. Scoring the JS-rendered DOM
+  // here would let a page "pass" GEO checks on content that GPTBot/
+  // ClaudeBot/CCBot never see, which defeats the point of crawling twice.
+  const rawHeadings = extractHeadingsFromHtml(rawCrawl.html);
+
+  const chunkResult = scoreChunkability(rawCrawl.text, rawHeadings);
+  const semanticResult = scoreSemanticHtml(rawCrawl.html);
+  const citationResult = scoreCitationDensity(rawCrawl.text);
+  const directAnswerResult = scoreDirectAnswer(rawCrawl.text, rawHeadings);
   const jsResult = scoreJsDependency(diff);
 
   const weighted = [
